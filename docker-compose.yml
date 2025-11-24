@@ -1,0 +1,14 @@
+version: "3.8"
+
+services:
+  gps-api:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./:/app:delegated
+      - ./data:/data
+    environment:
+      - GPS_DB_PATH=/data/gps_data.db
+      - FLASK_ENV=production
+    restart: unless-stopped

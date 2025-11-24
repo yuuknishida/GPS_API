@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+        <title>GPS Tracker</title>
+    </head>
+    <body>
+        <style>
+            #map { height: 75vh; min-height: 400px; width: 80vh; min-width: 600px; }
+            body { margin: 0; font-family: sans-serif; }
+        </style>
+        <h1>GPS Tracker Map</h1>
+        <div id="map"></div>
+        <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+        <script>
+            var map = L.map('map').setView([0,0], 2);
+            var marker = L.marker([0, 0]).addTo(map);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19}).addTo(map);
+
+            var firstUpdate = true;
+
+            function updateMarker() {
+                fetch('./gps/latest')
+                    .then(response => response.json())
+                    .then(data => {
+                        var lat = Number(data.latitude);
+                        var lng = Number(data.longitude);
+                        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+                            marker.setLatLng([lat, lng]);
+                            marker.bindPopup("Lat: " + lat.toFixed(6) + " Lng: " + lng.toFixed(6));
+                            if (firstUpdate) {
+                                firstUpdate = false;
+                                marker.setView([lat, lng]);
+                                marker.openPopup();
+                            } else {
+                                map.panTo([lat, lng]);
+                            }
+                        }
+                    }).catch(err => {
+                        console.error('Failed to fetch GPS coordinates: ', err);
+                    });
+            }
+
+            updateMarker();
+            setInterval(updateMarker, 1000);
+        </script>
+        
+    </body>
+</html>

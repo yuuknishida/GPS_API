@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual env
+venv/
+.env
+
+# Editor and Git
+.vscode/
+.idea/
+.DS_Store
+.git
+
+# Local data
+data/
+
+# Builds
+build/
+dist/
