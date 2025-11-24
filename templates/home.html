@@ -10,13 +10,22 @@
     </head>
     <body>
         <style>
-            #map { height: 75vh; min-height: 400px; width: 80vh; min-width: 600px; }
-            body { margin: 0; font-family: sans-serif; }
+            /* Layout: header at top, map centered in the remaining view */
+            html, body { height: 100%; margin: 0; font-family: sans-serif; }
+            body { display: flex; flex-direction: column; }
+            header { padding: 16px 0; text-align: center; }
+            .map-wrapper { flex: 1; display: flex; justify-content: center; align-items: center; padding: 8px; }
+            /* Constrain width for responsiveness, set height using viewport percent */
+            #map { width: 90%; max-width: 1200px; height: 70vh; min-height: 400px; }
+            @media (max-width: 768px) { #map { width: 96%; height: 60vh; min-height: 320px; } }
         </style>
-        <h1>GPS Tracker Map</h1>
-        <div id="map"></div>
-        <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-        <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+        <header>
+            <h1>GPS Tracker Map</h1>
+        </header>
+        <div class="map-wrapper">
+            <div id="map"></div>
+        </div>
+        <!-- Leaflet included in head already; avoid duplicate includes -->
         <script>
             var map = L.map('map').setView([0,0], 2);
             var marker = L.marker([0, 0]).addTo(map);
@@ -36,9 +45,13 @@
                             marker.bindPopup("Lat: " + lat.toFixed(6) + " Lng: " + lng.toFixed(6));
                             if (firstUpdate) {
                                 firstUpdate = false;
-                                marker.setView([lat, lng]);
+                                // Center the map on the marker (correct API call)
+                                map.setView([lat, lng], 13);
+                                // Fix sizing if the map container was not fully laid out on load
+                                setTimeout(function(){ map.invalidateSize(); }, 200);
                                 marker.openPopup();
                             } else {
+                                // Smoothly pan the map to the new marker position
                                 map.panTo([lat, lng]);
                             }
                         }
