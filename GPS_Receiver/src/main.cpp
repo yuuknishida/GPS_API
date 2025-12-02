@@ -15,7 +15,15 @@
 
 const long frequency = 915E6;
 String data_str;
-const char *serverURL = "http://192.168.1.17:5000/gps";
+
+// Toggle this to switch between local and cloud
+#define USE_CLOUD true  // Set to false for local testing
+
+#if USE_CLOUD
+const char *serverURL = "https://gps-tracker-backend-fqq3.onrender.com/"; // UPDATE THIS!
+#else
+  const char *serverURL = "http://192.168.1.17:5000/gps";
+#endif
 
 // put function declarations here:
 
