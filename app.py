@@ -37,6 +37,11 @@ with app.app_context():
 
 @app.route('/')
 def home():
+    try:
+        GPSData.query.delete()
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
     return render_template('home.html')
 
 @app.route('/gps', methods=['POST'])
