@@ -86,45 +86,39 @@ void setup()
 
 void loop()
 {
-  static unsigned long lastSend = 0;
-  const unsigned long sendInterval = 2000;
   // Read GPS data character by character
   while (Serial1.available())
   {
     char c = Serial1.read();
-    Serial.print(c);
+    // Serial.print(c);
 
     gps.encode(c);
   }
 
-  if (millis() - lastSend >= sendInterval)
+  if (gps.location.isValid())
   {
-    if (gps.location.isValid())
-    {
-      lastSend = millis();
+    double lat = gps.location.lat();
+    double lng = gps.location.lng();
+    double spd = gps.speed.mph();
+    double alt = gps.altitude.meters();
+    int satellites = gps.satellites.value();
 
-      double lat = gps.location.lat();
-      double lng = gps.location.lng();
-      double spd = gps.speed.mph();
-      double alt = gps.altitude.meters();
-      int satellites = gps.satellites.value();
+    snprintf(gps_buf, sizeof(gps_buf), "<%.6f,%.6f,%.1f,%.2f,%d>", lat, lng, alt, spd, satellites);
+    // String gps_str = "<" + String(lat, 6) + "," +
+    //                        String(lng, 6) + "," +
+    //                        String(alt, 1) + "," +
+    //                        String(spd, 2) + "," +
+    //                        String(satellites) + ">";
 
-      snprintf(gps_buf, sizeof(gps_buf), "<%.6f,%.6f,%.1f,%.2f,%d>", lat, lng, alt, spd, satellites);
-      // String gps_str = "<" + String(lat, 6) + "," +
-      //                        String(lng, 6) + "," +
-      //                        String(alt, 1) + "," +
-      //                        String(spd, 2) + "," +
-      //                        String(satellites) + ">";
-
-      Serial.println("\nSending: " + String(gps_buf));
-      rfm95_sendPacket(gps_buf);
-    }
-    else
-    {
-      Serial.println("\nWaiting for GPS fix...");
-      Serial.print("Satellites in view: ");
-      Serial.println(gps.satellites.value());
-    }
+    Serial.println("\nSending: " + String(gps_buf));
+    rfm95_sendPacket(gps_buf);
+    delay(1000);
+  }
+  else
+  {
+    Serial.println("\nWaiting for GPS fix...");
+    Serial.print("Satellites in view: ");
+    Serial.println(gps.satellites.value());
   }
 }
 

@@ -39,6 +39,7 @@ String data_str;
 
 // Toggle this to switch between local and cloud
 #define USE_CLOUD true // Set to false for local testing
+#define MOBILE_HOTSPOT true
 
 #if USE_CLOUD
 const char *serverURL = "https://gps-tracker-backend-fqq3.onrender.com/gps"; // UPDATE THIS!
@@ -46,9 +47,14 @@ const char *serverURL = "https://gps-tracker-backend-fqq3.onrender.com/gps"; // 
 const char *serverURL = "http://192.168.1.17:5000/gps";
 #endif
 
+#if MOBILE_HOTSPOT
+String ssid = "iPhone (2)";
+String password = "082601Yn";
+#else
 // put function declarations here:
 String ssid = "SpectrumSetup-CF";
 String password = "tabletdomain104";
+#endif
 
 void setup()
 {
