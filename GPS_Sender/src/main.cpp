@@ -3,7 +3,57 @@
 #include <Arduino.h>
 #include <SoftwareSerial.h>
 #include <SPI.h>
-#include <LoRa.h>
+
+// registers
+#define REG_FIFO 0x00
+#define REG_OP_MODE 0x01
+#define REG_FRF_MSB 0x06
+#define REG_FRF_MID 0x07
+#define REG_FRF_LSB 0x08
+#define REG_PA_CONFIG 0x09
+#define REG_LNA 0x0cu
+#define REG_FIFO_ADDR_PTR 0x0d
+#define REG_FIFO_TX_BASE_ADDR 0x0e
+#define REG_FIFO_RX_BASE_ADDR 0x0f
+#define REG_FIFO_RX_CURRENT_ADDR 0x10
+#define REG_IRQ_FLAGS 0x12
+#define REG_RX_NB_BYTES 0x13
+#define REG_PKT_RSSI_VALUE 0x1a
+#define REG_RSSI_VALUE 0x1b
+#define REG_MODEM_CONFIG_1 0x1d
+#define REG_MODEM_CONFIG_2 0x1e
+#define REG_PREAMBLE_MSB 0x20
+#define REG_PREAMBLE_LSB 0x21
+#define REG_PAYLOAD_LENGTH 0x22
+#define REG_MODEM_CONFIG_3 0x26
+#define REG_FREQ_ERROR_MSB 0x28
+#define REG_FREQ_ERROR_MID 0x29
+#define REG_FREQ_ERROR_LSB 0x2a
+#define REG_RSSI_WIDEBAND 0x2c
+#define REG_DETECTION_OPTIMIZE 0x31
+#define REG_INVERTIQ 0x33
+#define REG_DETECTION_THRESHOLD 0x37
+#define REG_SYNC_WORD 0x39
+#define REG_INVERTIQ2 0x3b
+#define REG_DIO_MAPPING_1 0x40
+#define REG_VERSION 0x42
+#define REG_PA_DAC 0x4d
+
+// modes
+#define MODE_LONG_RANGE 0x80
+#define MODE_SLEEP 0x00
+#define MODE_STDBY 0x01
+#define MODE_TX 0x03
+#define MODE_RX_CONTINUOUS 0x05
+#define MODE_RX_SINGLE 0x06
+
+// PA config
+#define PA_BOOST 0x80
+
+// IRQ masks
+#define IRQ_TX_DONE_MASK 0x08
+#define IRQ_PAYLOAD_CRC_ERROR_MASK 0x20
+#define IRQ_RX_DONE_MASK 0x40
 
 #define SCK_PIN 13
 #define MISO_PIN 12
@@ -29,6 +79,107 @@ GPSData gpsData;
 String nmeaSentence = "";
 
 // Function declarations
+void rfm95_writeReg(uint8_t address, uint8_t value)
+{
+  digitalWrite(CS_PIN, LOW);
+  SPI.transfer(address | 0x80);
+  SPI.transfer(value);
+  digitalWrite(CS_PIN, HIGH);
+}
+
+uint8_t rfm95_readReg(uint8_t address)
+{
+  digitalWrite(CS_PIN, LOW);
+  SPI.transfer(address & 0x7f);
+  uint8_t value = SPI.transfer(0x00);
+  digitalWrite(CS_PIN, HIGH);
+  return value;
+}
+
+void rfm95_hardwareReset()
+{
+  digitalWrite(RESET_PIN, LOW);
+  delay(10);
+  digitalWrite(RESET_PIN, HIGH);
+  delay(10);
+}
+
+void rfm95_setFrequency(long frequency)
+{
+  uint64_t frf = ((uint64_t)frequency << 19) / 32000000;
+  rfm95_writeReg(REG_FRF_MSB, (uint8_t)(frf >> 16));
+  rfm95_writeReg(REG_FRF_MID, (uint8_t)(frf >> 8));
+  rfm95_writeReg(REG_FRF_LSB, (uint8_t)(frf >> 0));
+}
+
+void rfm95_setOpsMode(uint8_t mode)
+{
+  rfm95_writeReg(REG_OP_MODE, MODE_LONG_RANGE | mode);
+}
+
+bool rfm95_init(long frequency)
+{
+  pinMode(CS_PIN, OUTPUT);
+  pinMode(RESET_PIN, OUTPUT);
+  digitalWrite(CS_PIN, HIGH);
+
+  rfm95_hardwareReset();
+
+  uint8_t version = rfm95_readReg(REG_VERSION);
+  if (version != 0x12)
+  {
+    return false;
+  }
+
+  rfm95_setOpsMode(MODE_SLEEP);
+  rfm95_setFrequency(frequency);
+
+  rfm95_writeReg(REG_FIFO_TX_BASE_ADDR, 0);
+  rfm95_writeReg(REG_FIFO_RX_BASE_ADDR, 0);
+  rfm95_writeReg(REG_LNA, rfm95_readReg(REG_LNA) | 0x03);
+  rfm95_writeReg(REG_MODEM_CONFIG_3, 0x04);
+  rfm95_writeReg(REG_PA_CONFIG, 0x80 | 0x0f);
+  rfm95_writeReg(REG_SYNC_WORD, 0x12);
+  rfm95_writeReg(REG_MODEM_CONFIG_1, 0x72);
+  rfm95_writeReg(REG_MODEM_CONFIG_2, 0x74);
+  rfm95_writeReg(REG_PREAMBLE_MSB, 0x00);
+  rfm95_writeReg(REG_PREAMBLE_LSB, 0x08);
+
+  rfm95_setOpsMode(MODE_STDBY);
+
+  return true;
+}
+
+int rfm95_checkpacket()
+{
+  uint8_t irqFlags = rfm95_readReg(REG_IRQ_FLAGS);
+  rfm95_writeReg(REG_IRQ_FLAGS, irqFlags);
+
+  if ((irqFlags & IRQ_RX_DONE_MASK) && !(irqFlags & IRQ_PAYLOAD_CRC_ERROR_MASK))
+  {
+    int packetLength = rfm95_readReg(REG_RX_NB_BYTES);
+    rfm95_writeReg(REG_FIFO_ADDR_PTR, rfm95_readReg(REG_FIFO_RX_CURRENT_ADDR));
+    rfm95_setOpsMode(MODE_RX_CONTINUOUS);
+    return packetLength;
+  }
+  else if (rfm95_readReg(REG_OP_MODE) != (MODE_LONG_RANGE | MODE_RX_CONTINUOUS))
+  {
+    rfm95_writeReg(REG_FIFO_ADDR_PTR, 0);
+    rfm95_setOpsMode(MODE_RX_CONTINUOUS);
+  }
+  return 0;
+}
+
+int rfm95_readByte()
+{
+  return rfm95_readReg(REG_FIFO);
+}
+
+int rfm95_bytesAvailable()
+{
+  return (rfm95_readReg(REG_RX_NB_BYTES) - rfm95_readReg(REG_FIFO_ADDR_PTR));
+}
+
 SoftwareSerial gpsSerial(4, 3);
 void LoRa_SenderMode();
 void sendMessage(String message);
@@ -42,11 +193,12 @@ void setup()
   Serial.begin(9600);
   gpsSerial.begin(9600);
 
-  LoRa.setPins(CS_PIN, RESET_PIN, IRQ_PIN);
   SPI.begin();
-  LoRa_SenderMode();
+  SPI.setClockDivider(SPI_CLOCK_DIV16); // 8 MHz for 16 MHz Arduino
 
-  if (!LoRa.begin(frequency))
+  Serial.println("Initializing LoRa...");
+
+  if (!rfm95_init(frequency))
   {
     Serial.println("LoRa init failed. Check your connections.");
     while (true)
@@ -108,16 +260,48 @@ void loop()
 
 void LoRa_SenderMode()
 {
-  LoRa.idle();
-  LoRa.disableInvertIQ();
+  // Disable InvertIQ for normal transmission
+  rfm95_writeReg(REG_INVERTIQ, 0x27);
+  rfm95_writeReg(REG_INVERTIQ2, 0x1D);
+
+  // Set to standby mode (ready to transmit)
+  rfm95_setOpsMode(MODE_STDBY);
 }
 
 void sendMessage(String message)
 {
+  // Ensure we're in sender mode
   LoRa_SenderMode();
-  LoRa.beginPacket();
-  LoRa.print(message);
-  LoRa.endPacket(true);
+
+  // Get message length
+  int messageLength = message.length();
+  if (messageLength > 255)
+    messageLength = 255; // Max payload
+
+  // Set FIFO address pointer to TX base
+  rfm95_writeReg(REG_FIFO_ADDR_PTR, 0);
+
+  // Write message to FIFO
+  for (int i = 0; i < messageLength; i++)
+  {
+    rfm95_writeReg(REG_FIFO, message.charAt(i));
+  }
+
+  // Set payload length
+  rfm95_writeReg(REG_PAYLOAD_LENGTH, messageLength);
+
+  // Switch to TX mode to transmit
+  rfm95_setOpsMode(MODE_TX);
+
+  // Wait for transmission to complete (TX_DONE flag)
+  while (!(rfm95_readReg(REG_IRQ_FLAGS) & IRQ_TX_DONE_MASK))
+    ;
+
+  // Clear IRQ flags
+  rfm95_writeReg(REG_IRQ_FLAGS, IRQ_TX_DONE_MASK);
+
+  // Return to standby mode
+  rfm95_setOpsMode(MODE_STDBY);
 }
 
 // Parse NMEA sentence

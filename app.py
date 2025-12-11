@@ -4,13 +4,17 @@ from pickle import TRUE
 import os
 from flask import Flask, request, jsonify, render_template
 from flask_sqlalchemy import SQLAlchemy
+from flask_cors import CORS
 import datetime
 
 app = Flask(__name__)
+CORS(app)
 db_path = os.getenv('GPS_DB_PATH', 'gps_data.db')
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{db_path}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
+
+latest_entry = None
 
 class GPSData(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -19,7 +23,7 @@ class GPSData(db.Model):
     altitude = db.Column(db.Float, nullable=False)
     speed = db.Column(db.Float, nullable=False)
     satellites = db.Column(db.Integer, nullable=False)
-    timestamp = db.Column(db.DateTime, default=datetime.datetime.now())
+    timestamp = db.Column(db.DateTime, default=lambda: datetime.datetime.now())
 
     def as_dict(self):
         return {
@@ -37,15 +41,16 @@ with app.app_context():
 
 @app.route('/')
 def home():
-    try:
-        GPSData.query.delete()
-        db.session.commit()
-    except Exception as e:
-        db.session.rollback()
+    # try:
+    #     GPSData.query.delete()
+    #     db.session.commit()
+    # except Exception as e:
+    #     db.session.rollback()
     return render_template('home.html')
 
 @app.route('/gps', methods=['POST'])
 def receive_gps():
+    global latest_entry
     data = request.get_json()
     if not data:
         return jsonify({"error": "No JSON sent"}), 400
@@ -60,17 +65,17 @@ def receive_gps():
         )
         db.session.add(gps_entry)
         db.session.commit()
+        latest_entry = gps_entry
         return jsonify({"status": "success", "data": gps_entry.as_dict()})
     except KeyError as e:
         return jsonify({"error": f"Missing field {e}"}), 400
     
 @app.route('/gps/latest', methods=['GET'])
 def get_latest_gps():
-    latest = GPSData.query.order_by(GPSData.timestamp.desc()).first()
-    if latest:
-        return jsonify(latest.as_dict())
-    else:
-        return jsonify({"error": "No data found!"}), 404
+    latest = GPSData.query.order_by(GPSData.timestampdesc()).first()
+    if latest_entry:
+        return jsonify(latest_entry.as_dict())
+    return jsonify({"error": "No data yet"}), 404
     
 @app.route('/gps/all', methods=['GET'])
 def get_all_gps():

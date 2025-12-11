@@ -83,15 +83,15 @@ void loop() {
 
         Serial.print("  Latitude: ");
         Serial.print(latitude, 6);
-        Serial.print("  Longitude: ");
+        Serial.print(",  Longitude: ");
         Serial.print(longitude, 6);
-        Serial.print("  Altitude: ");
+        Serial.print(",  Altitude: ");
         Serial.print(altitude, 1);
         Serial.print(" m");
-        Serial.print("  Speed: ");
+        Serial.print(",  Speed: ");
         Serial.print(speed, 2);
         Serial.print(" mph");
-        Serial.print("  Satellites: ");
+        Serial.print(",  Satellites: ");
         Serial.println(satellites);
 
         String jsonPayLoad = "{\"latitude\":" + String(latitude, 6) + 

@@ -35,7 +35,7 @@
             var firstUpdate = true;
 
             function updateMarker() {
-                fetch('./gps/latest')
+                fetch('https://gps-tracker-backend-fqq3.onrender.com/gps/latest')
                     .then(response => response.json())
                     .then(data => {
                         var lat = Number(data.latitude);
@@ -61,7 +61,7 @@
             }
 
             updateMarker();
-            setInterval(updateMarker, 1000);
+            setInterval(updateMarker, 300);
         </script>
         
     </body>
