@@ -72,7 +72,7 @@ def receive_gps():
     
 @app.route('/gps/latest', methods=['GET'])
 def get_latest_gps():
-    latest = GPSData.query.order_by(GPSData.timestampdesc()).first()
+    latest = GPSData.query.order_by(GPSData.timestamp.desc()).first()
     if latest_entry:
         return jsonify(latest_entry.as_dict())
     return jsonify({"error": "No data yet"}), 404
