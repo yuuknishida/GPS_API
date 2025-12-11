@@ -50,7 +50,6 @@ def home():
 
 @app.route('/gps', methods=['POST'])
 def receive_gps():
-    global latest_entry
     data = request.get_json()
     if not data:
         return jsonify({"error": "No JSON sent"}), 400
@@ -65,7 +64,17 @@ def receive_gps():
         )
         db.session.add(gps_entry)
         db.session.commit()
-        latest_entry = gps_entry
+
+        total_count = GPSData.query.count()
+        if total_count > 20:
+            records_to_keep = db.session.query(GPSData.id)\
+                .order_by(GPSData.timestamp.desc())\
+                .limit(20)\
+                .all()
+            keep_ids = [r.id for r in records_to_keep]
+            GPSData.query.filter(~GPSData.id.in_(keep_ids)).delete(synchronize_session=False)
+            db.session.commit()
+            
         return jsonify({"status": "success", "data": gps_entry.as_dict()})
     except KeyError as e:
         return jsonify({"error": f"Missing field {e}"}), 400
@@ -73,8 +82,8 @@ def receive_gps():
 @app.route('/gps/latest', methods=['GET'])
 def get_latest_gps():
     latest = GPSData.query.order_by(GPSData.timestamp.desc()).first()
-    if latest_entry:
-        return jsonify(latest_entry.as_dict())
+    if latest:
+        return jsonify(latest.as_dict())
     return jsonify({"error": "No data yet"}), 404
     
 @app.route('/gps/all', methods=['GET'])

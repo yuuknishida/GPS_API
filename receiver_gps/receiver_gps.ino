@@ -65,22 +65,27 @@ void setup()
     delay(500);
     retries++;
   }
-  
-  if (WiFi.status() == WL_CONNECTED){
+
+  if (WiFi.status() == WL_CONNECTED)
+  {
     Serial.println("\nWiFi connected!");
     Serial.print("Local IP: ");
     Serial.println(WiFi.localIP());
-  } else {
+  }
+  else
+  {
     Serial.println("\nFailed to connect.");
   }
-  
+
   Serial.println("Initializing LoRa");
   if (!rfm95_init(frequency))
   {
     Serial.println("Starting LoRa failed");
     while (1)
       ;
-  } else {
+  }
+  else
+  {
     Serial.println("LoRa initialized successfully");
   }
   rfm95_writeReg(REG_FIFO_RX_BASE_ADDR, 0x80);
@@ -102,9 +107,10 @@ void loop()
     String received = msg;
     Serial.print("Received: ");
     Serial.println(msg);
-    
-    if (received.startsWith("<") && received.endsWith(">")) {
-      received = received.substring(1, received.length()-1);
+
+    if (received.startsWith("<") && received.endsWith(">"))
+    {
+      received = received.substring(1, received.length() - 1);
 
       // latitude,longitude,altitude,speed,satellites
       int comma1 = received.indexOf(',');
@@ -130,25 +136,25 @@ void loop()
         {
           HTTPClient http;
           String jsonPayLoad = "{\"latitude\":" + String(latitude, 6) +
-                              ",\"longitude\":" + String(longitude, 6) +
-                              ",\"altitude\":" + String(altitude, 1) +
-                              ",\"speed\":" + String(speed) +
-                              ",\"satellites\":" + String(satellites) + "}";
+                               ",\"longitude\":" + String(longitude, 6) +
+                               ",\"altitude\":" + String(altitude, 1) +
+                               ",\"speed\":" + String(speed) +
+                               ",\"satellites\":" + String(satellites) + "}";
 
           http.begin(serverURL);
           http.addHeader("Content-Type", "application/json");
           int httpResponseCode = http.POST(jsonPayLoad);
           Serial.println("HTTP Response Code: " + String(httpResponseCode));
           http.end();
-        } 
-      }   
+        }
+      }
     }
-  } 
-  delay(300);
+  }
 }
 
 // ---------------- LoRa helper functions ----------------
-void rfm95_writeReg(uint8_t address, uint8_t value) {
+void rfm95_writeReg(uint8_t address, uint8_t value)
+{
   SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
   digitalWrite(CS_PIN, LOW);
   SPI.transfer(address | 0x80);
@@ -157,7 +163,8 @@ void rfm95_writeReg(uint8_t address, uint8_t value) {
   SPI.endTransaction();
 }
 
-uint8_t rfm95_readReg(uint8_t address) {
+uint8_t rfm95_readReg(uint8_t address)
+{
   SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
   digitalWrite(CS_PIN, LOW);
   SPI.transfer(address & 0x7f);
@@ -167,25 +174,29 @@ uint8_t rfm95_readReg(uint8_t address) {
   return value;
 }
 
-void rfm95_hardwareReset() {
+void rfm95_hardwareReset()
+{
   digitalWrite(RESET_PIN, LOW);
   delay(10);
   digitalWrite(RESET_PIN, HIGH);
   delay(10);
 }
 
-void rfm95_setFrequency(long frequency) {
+void rfm95_setFrequency(long frequency)
+{
   uint64_t frf = ((uint64_t)frequency << 19) / 32000000;
   rfm95_writeReg(REG_FRF_MSB, frf >> 16);
   rfm95_writeReg(REG_FRF_MID, frf >> 8);
   rfm95_writeReg(REG_FRF_LSB, frf >> 0);
 }
 
-void rfm95_setOpsMode(uint8_t mode) {
+void rfm95_setOpsMode(uint8_t mode)
+{
   rfm95_writeReg(REG_OP_MODE, MODE_LONG_RANGE | mode);
 }
 
-bool rfm95_init(long frequency) {
+bool rfm95_init(long frequency)
+{
   pinMode(CS_PIN, OUTPUT);
   pinMode(RESET_PIN, OUTPUT);
   digitalWrite(CS_PIN, HIGH);
@@ -194,7 +205,8 @@ bool rfm95_init(long frequency) {
   rfm95_hardwareReset();
 
   uint8_t version = rfm95_readReg(REG_VERSION);
-  if (version != 0x12) return false;
+  if (version != 0x12)
+    return false;
 
   rfm95_setOpsMode(MODE_SLEEP);
   rfm95_setFrequency(frequency);
@@ -202,9 +214,11 @@ bool rfm95_init(long frequency) {
   return true;
 }
 
-int rfm95_checkpacket() {
+int rfm95_checkpacket()
+{
   uint8_t irqFlags = rfm95_readReg(REG_IRQ_FLAGS);
-  if (irqFlags & IRQ_RX_DONE_MASK) {
+  if (irqFlags & IRQ_RX_DONE_MASK)
+  {
     int len = rfm95_readReg(REG_RX_NB_BYTES);
     rfm95_writeReg(REG_IRQ_FLAGS, IRQ_RX_DONE_MASK); // clear flag
     rfm95_writeReg(REG_FIFO_ADDR_PTR, rfm95_readReg(REG_FIFO_RX_CURRENT_ADDR));
@@ -213,9 +227,11 @@ int rfm95_checkpacket() {
   return 0;
 }
 
-void rfm95_readPacket(char* buffer, int packetLength) {
+void rfm95_readPacket(char *buffer, int packetLength)
+{
   rfm95_writeReg(REG_FIFO_ADDR_PTR, rfm95_readReg(REG_FIFO_RX_CURRENT_ADDR));
-  for(int i = 0; i < packetLength; i++) {
+  for (int i = 0; i < packetLength; i++)
+  {
     buffer[i] = (char)rfm95_readReg(REG_FIFO);
   }
   buffer[packetLength] = '\0';

@@ -25,7 +25,7 @@
 #define MODE_LONG_RANGE 0x80
 #define MODE_SLEEP 0x00
 #define MODE_STDBY 0x01
-#define MODE_TX   0x03
+#define MODE_TX 0x03
 #define MODE_RX_CONTINUOUS 0x05
 
 #define IRQ_TX_DONE_MASK 0x08
@@ -74,7 +74,7 @@ void setup()
     while (true)
       ;
   }
-  
+
   rfm95_writeReg(REG_FIFO_TX_BASE_ADDR, 0x00);
   rfm95_writeReg(REG_FIFO_RX_BASE_ADDR, 0x80);
   rfm95_writeReg(REG_FIFO_ADDR_PTR, 0x00);
@@ -86,6 +86,8 @@ void setup()
 
 void loop()
 {
+  static unsigned long lastSend = 0;
+  const unsigned long sendInterval = 2000;
   // Read GPS data character by character
   while (Serial1.available())
   {
@@ -95,27 +97,34 @@ void loop()
     gps.encode(c);
   }
 
-  if (gps.location.isValid()) {
-    double lat = gps.location.lat();
-    double lng = gps.location.lng();
-    double spd = gps.speed.mph();
-    double alt = gps.altitude.meters();
-    int satellites = gps.satellites.value();
+  if (millis() - lastSend >= sendInterval)
+  {
+    if (gps.location.isValid())
+    {
+      lastSend = millis();
 
-    snprintf(gps_buf, sizeof(gps_buf), "<%.6f,%.6f,%.1f,%.2f,%d>", lat, lng, alt, spd, satellites);
-    // String gps_str = "<" + String(lat, 6) + "," +
-    //                        String(lng, 6) + "," +
-    //                        String(alt, 1) + "," +
-    //                        String(spd, 2) + "," +
-    //                        String(satellites) + ">";
-    
-    Serial.println("\nSending: " + String(gps_buf));
-    rfm95_sendPacket(gps_buf);
-    delay(1000);
-  } else {
-    Serial.println("\nWaiting for GPS fix...");
-    Serial.print("Satellites in view: ");
-    Serial.println(gps.satellites.value());
+      double lat = gps.location.lat();
+      double lng = gps.location.lng();
+      double spd = gps.speed.mph();
+      double alt = gps.altitude.meters();
+      int satellites = gps.satellites.value();
+
+      snprintf(gps_buf, sizeof(gps_buf), "<%.6f,%.6f,%.1f,%.2f,%d>", lat, lng, alt, spd, satellites);
+      // String gps_str = "<" + String(lat, 6) + "," +
+      //                        String(lng, 6) + "," +
+      //                        String(alt, 1) + "," +
+      //                        String(spd, 2) + "," +
+      //                        String(satellites) + ">";
+
+      Serial.println("\nSending: " + String(gps_buf));
+      rfm95_sendPacket(gps_buf);
+    }
+    else
+    {
+      Serial.println("\nWaiting for GPS fix...");
+      Serial.print("Satellites in view: ");
+      Serial.println(gps.satellites.value());
+    }
   }
 }
 
@@ -169,7 +178,8 @@ void sendMessage(String message)
 }
 
 // Function declarations
-void rfm95_writeReg(uint8_t address, uint8_t value) {
+void rfm95_writeReg(uint8_t address, uint8_t value)
+{
   SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
   digitalWrite(CS_PIN, LOW);
   SPI.transfer(address | 0x80);
@@ -178,7 +188,8 @@ void rfm95_writeReg(uint8_t address, uint8_t value) {
   SPI.endTransaction();
 }
 
-uint8_t rfm95_readReg(uint8_t address) {
+uint8_t rfm95_readReg(uint8_t address)
+{
   SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
   digitalWrite(CS_PIN, LOW);
   SPI.transfer(address & 0x7f);
@@ -188,25 +199,29 @@ uint8_t rfm95_readReg(uint8_t address) {
   return value;
 }
 
-void rfm95_hardwareReset() {
+void rfm95_hardwareReset()
+{
   digitalWrite(RESET_PIN, LOW);
   delay(10);
   digitalWrite(RESET_PIN, HIGH);
   delay(10);
 }
 
-void rfm95_setFrequency(long frequency) {
+void rfm95_setFrequency(long frequency)
+{
   uint64_t frf = ((uint64_t)frequency << 19) / 32000000;
   rfm95_writeReg(REG_FRF_MSB, frf >> 16);
   rfm95_writeReg(REG_FRF_MID, frf >> 8);
   rfm95_writeReg(REG_FRF_LSB, frf >> 0);
 }
 
-void rfm95_setOpsMode(uint8_t mode) {
+void rfm95_setOpsMode(uint8_t mode)
+{
   rfm95_writeReg(REG_OP_MODE, MODE_LONG_RANGE | mode);
 }
 
-bool rfm95_init(long frequency) {
+bool rfm95_init(long frequency)
+{
   pinMode(CS_PIN, OUTPUT);
   pinMode(RESET_PIN, OUTPUT);
   digitalWrite(CS_PIN, HIGH);
@@ -215,7 +230,8 @@ bool rfm95_init(long frequency) {
   rfm95_hardwareReset();
 
   uint8_t version = rfm95_readReg(REG_VERSION);
-  if (version != 0x12) return false;
+  if (version != 0x12)
+    return false;
 
   rfm95_setOpsMode(MODE_SLEEP);
   rfm95_setFrequency(frequency);
@@ -224,21 +240,27 @@ bool rfm95_init(long frequency) {
   return true;
 }
 
-void rfm95_sendPacket(const char* data) {
+void rfm95_sendPacket(const char *data)
+{
   int len = strlen(data);
-  if (len > 255) len = 255;
+  if (len > 255)
+    len = 255;
 
   rfm95_setOpsMode(MODE_STDBY);
   rfm95_writeReg(REG_FIFO_ADDR_PTR, 0x00);
 
-  for (int i = 0; i < len; i++) {
+  for (int i = 0; i < len; i++)
+  {
     rfm95_writeReg(REG_FIFO, data[i]);
   }
 
   rfm95_writeReg(REG_PAYLOAD_LENGTH, len);
   rfm95_setOpsMode(MODE_TX);
 
-  while(!(rfm95_readReg(REG_IRQ_FLAGS) & IRQ_TX_DONE_MASK)){yield();}
+  while (!(rfm95_readReg(REG_IRQ_FLAGS) & IRQ_TX_DONE_MASK))
+  {
+    yield();
+  }
 
   rfm95_writeReg(REG_IRQ_FLAGS, IRQ_TX_DONE_MASK);
   rfm95_setOpsMode(MODE_STDBY);
