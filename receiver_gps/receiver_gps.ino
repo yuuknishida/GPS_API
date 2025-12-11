@@ -39,7 +39,7 @@ String data_str;
 
 // Toggle this to switch between local and cloud
 #define USE_CLOUD true // Set to false for local testing
-#define MOBILE_HOTSPOT true
+#define MOBILE_HOTSPOT false
 
 #if USE_CLOUD
 const char *serverURL = "https://gps-tracker-backend-fqq3.onrender.com/gps"; // UPDATE THIS!
@@ -47,14 +47,9 @@ const char *serverURL = "https://gps-tracker-backend-fqq3.onrender.com/gps"; // 
 const char *serverURL = "http://192.168.1.17:5000/gps";
 #endif
 
-#if MOBILE_HOTSPOT
-String ssid = "iPhone (2)";
-String password = "082601Yn";
-#else
 // put function declarations here:
 String ssid = "SpectrumSetup-CF";
 String password = "tabletdomain104";
-#endif
 
 void setup()
 {
@@ -96,14 +91,14 @@ void setup()
   }
   rfm95_writeReg(REG_FIFO_RX_BASE_ADDR, 0x80);
   rfm95_writeReg(REG_FIFO_ADDR_PTR, 0x80);
-  rfm95_writeReg(0x1E, 0x74 | 0x04); // SF7 + CRC
+  rfm95_writeReg(0x1E, 0xA4 | 0x04); // SF10 + CRC
   rfm95_setOpsMode(MODE_RX_CONTINUOUS);
 }
 
 void loop()
 {
   // put your main code here, to run repeatedly:
-  Serial.println("Checking for packets...");
+  //Serial.println("Checking for packets...");
   int parseSize = rfm95_checkpacket();
   if (parseSize > 0)
   {
@@ -216,6 +211,9 @@ bool rfm95_init(long frequency)
 
   rfm95_setOpsMode(MODE_SLEEP);
   rfm95_setFrequency(frequency);
+
+  rfm95_writeReg(REG_PA_CONFIG, 0xFF);
+  rfm95_writeReg(REG_LNA, 0x23);
   rfm95_setOpsMode(MODE_STDBY);
   return true;
 }

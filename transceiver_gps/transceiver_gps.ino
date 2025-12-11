@@ -79,7 +79,7 @@ void setup()
   rfm95_writeReg(REG_FIFO_RX_BASE_ADDR, 0x80);
   rfm95_writeReg(REG_FIFO_ADDR_PTR, 0x00);
 
-  rfm95_writeReg(0x1e, 0x74 | 0x04);
+  rfm95_writeReg(0x1e, 0xA4 | 0x04);
 
   rfm95_setOpsMode(MODE_STDBY);
 }
@@ -103,7 +103,7 @@ void loop()
     double alt = gps.altitude.meters();
     int satellites = gps.satellites.value();
 
-    snprintf(gps_buf, sizeof(gps_buf), "<%.6f,%.6f,%.1f,%.2f,%d>", lat, lng, alt, spd, satellites);
+    snprintf(gps_buf, sizeof(gps_buf), "<%.6f,%.6f,%.2f,%.2f,%d>", lat, lng, alt, spd, satellites);
     // String gps_str = "<" + String(lat, 6) + "," +
     //                        String(lng, 6) + "," +
     //                        String(alt, 1) + "," +
@@ -229,6 +229,9 @@ bool rfm95_init(long frequency)
 
   rfm95_setOpsMode(MODE_SLEEP);
   rfm95_setFrequency(frequency);
+
+  rfm95_writeReg(REG_PA_CONFIG, 0xFF);
+  rfm95_writeReg(REG_LNA, 0x23);
   rfm95_setOpsMode(MODE_STDBY);
 
   return true;
